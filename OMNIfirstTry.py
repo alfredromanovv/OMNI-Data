@@ -13,25 +13,38 @@ import matplotlib.dates as mdates
 # НАСТРОЙКИ
 # ============================================================
 
-# Укажи пути к трем файлам
+# Добавляй сюда сколько угодно файлов.
+#
+# path  -- путь к файлу
+# label -- подпись в легенде
+#
+# Цвет каждой линии выбирается автоматически.
 
-FILE_1H = Path(
-    r"F:\Yandex.Disk\Универ\Семестр 11\Научка\Игра с данными\OMNI_1hour_2020.txt"
-)
+FILES = [
 
-FILE_1D = Path(
-    r"F:\Yandex.Disk\Универ\Семестр 11\Научка\Игра с данными\OMNI_1day_2020.txt"
-)
+    {
+        "path": Path(
+            r"F:\Yandex.Disk\Универ\Семестр 11\Научка\Игра с данными\23_цикл\OMNI_27days.txt"
+        ),
+        "label": "27 days averaged",
+    },
 
-FILE_27D = Path(
-    r"F:\Yandex.Disk\Универ\Семестр 11\Научка\Игра с данными\OMNI_27day_2020.txt"
-)
+    # Можно добавлять дальше:
+    #
+    # {
+    #     "path": Path(r"F:\...\another_file.txt"),
+    #     "label": "Another dataset",
+    # },
+
+]
 
 
 SAVE_FIGURES = False
 SHOW_FIGURES = True
 
-OUTPUT_DIR = FILE_1H.parent / "OMNI_compare"
+# Куда сохранять картинки.
+# Берётся папка первого файла.
+OUTPUT_DIR = FILES[0]["path"].parent / "OMNI_compare"
 
 
 # ============================================================
@@ -89,7 +102,7 @@ def load_omni_file(filename: Path):
         )
 
     # --------------------------------------------------------
-    # Формат:
+    # Формат файла:
     #
     # 0 YEAR
     # 1 DOY
@@ -106,7 +119,8 @@ def load_omni_file(filename: Path):
 
     if data.shape[1] < 6:
         raise RuntimeError(
-            f"Ожидалось 6 столбцов, найдено: {data.shape[1]}"
+            f"В файле {filename}\n"
+            f"ожидалось минимум 6 столбцов, найдено: {data.shape[1]}"
         )
 
     year = data[:, 0].astype(int)
@@ -123,11 +137,7 @@ def load_omni_file(filename: Path):
 
     time = []
 
-    for y, d, h in zip(
-        year,
-        doy,
-        hour
-    ):
+    for y, d, h in zip(year, doy, hour):
 
         t = (
             datetime(int(y), 1, 1)
@@ -143,27 +153,52 @@ def load_omni_file(filename: Path):
     # УДАЛЕНИЕ FILL VALUES
     # ========================================================
 
-    # официальные значения для OMNI LRO
+    # OMNI fill values
 
-    T[
-        T >= 9999999.0
-    ] = np.nan
+    T[T >= 9999999.0] = np.nan
+    n[n >= 999.9] = np.nan
+    V[V >= 9999.0] = np.nan
 
-    n[
-        n >= 999.9
-    ] = np.nan
-
-    V[
-        V >= 9999.0
-    ] = np.nan
-
-    # дополнительно убираем нефизические <= 0
+    # Убираем нефизические значения
 
     T[T <= 0] = np.nan
     n[n <= 0] = np.nan
     V[V <= 0] = np.nan
 
     return time, V, n, T
+
+
+# ============================================================
+# ЗАГРУЗКА ВСЕХ ФАЙЛОВ
+# ============================================================
+
+def load_all_files():
+
+    datasets = []
+
+    for item in FILES:
+
+        path = item["path"]
+        label = item.get(
+            "label",
+            path.stem
+        )
+
+        time, V, n, T = load_omni_file(path)
+
+        datasets.append({
+
+            "path": path,
+            "label": label,
+
+            "time": time,
+
+            "V": V,
+            "n": n,
+            "T": T,
+        })
+
+    return datasets
 
 
 # ============================================================
@@ -235,54 +270,48 @@ def finish_figure(fig, filename):
 
     if SHOW_FIGURES:
         plt.show()
+
     else:
         plt.close(fig)
 
 
 # ============================================================
-# СКОРОСТЬ
+# УНИВЕРСАЛЬНЫЙ ГРАФИК
 # ============================================================
 
-def plot_velocity(
-    time_1h, V_1h,
-    time_1d, V_1d,
-    time_27d, V_27d
+def plot_variable(
+    datasets,
+    variable,
+    ylabel,
+    filename
 ):
 
     fig, ax = plt.subplots()
 
-    ax.plot(
-        time_1h,
-        V_1h,
-        color="0.65",
-        linewidth=0.8,
-        label="1 hour"
-    )
+    # --------------------------------------------------------
+    # Здесь НЕТ указания color=...
+    #
+    # Поэтому matplotlib сам последовательно выбирает цвета
+    # из своей стандартной цветовой последовательности.
+    # --------------------------------------------------------
 
-    ax.plot(
-        time_1d,
-        V_1d,
-        color="tab:blue",
-        linewidth=1.5,
-        label="1 day"
-    )
+    for ds in datasets:
 
-    ax.plot(
-        time_27d,
-        V_27d,
-        color="tab:red",
-        linewidth=2.2,
-        marker="o",
-        markersize=4,
-        label="27 days"
-    )
+        ax.plot(
+            ds["time"],
+            ds[variable],
+
+            linewidth=1.5,
+
+            label=ds["label"]
+        )
 
     ax.set_xlabel(
         "Date"
     )
 
     ax.set_ylabel(
-        r"Solar-wind speed, km s$^{-1}$"
+        ylabel
     )
 
     ax.legend()
@@ -291,7 +320,25 @@ def plot_velocity(
 
     finish_figure(
         fig,
-        "compare_velocity.png"
+        filename
+    )
+
+
+# ============================================================
+# СКОРОСТЬ
+# ============================================================
+
+def plot_velocity(datasets):
+
+    plot_variable(
+
+        datasets=datasets,
+
+        variable="V",
+
+        ylabel=r"Solar-wind speed, km s$^{-1}$",
+
+        filename="compare_velocity.png"
     )
 
 
@@ -299,55 +346,17 @@ def plot_velocity(
 # ПЛОТНОСТЬ
 # ============================================================
 
-def plot_density(
-    time_1h, n_1h,
-    time_1d, n_1d,
-    time_27d, n_27d
-):
+def plot_density(datasets):
 
-    fig, ax = plt.subplots()
+    plot_variable(
 
-    ax.plot(
-        time_1h,
-        n_1h,
-        color="0.65",
-        linewidth=0.8,
-        label="1 hour"
-    )
+        datasets=datasets,
 
-    ax.plot(
-        time_1d,
-        n_1d,
-        color="tab:blue",
-        linewidth=1.5,
-        label="1 day"
-    )
+        variable="n",
 
-    ax.plot(
-        time_27d,
-        n_27d,
-        color="tab:red",
-        linewidth=2.2,
-        marker="o",
-        markersize=4,
-        label="27 days"
-    )
+        ylabel=r"Proton number density, cm$^{-3}$",
 
-    ax.set_xlabel(
-        "Date"
-    )
-
-    ax.set_ylabel(
-        r"Proton number density, cm$^{-3}$"
-    )
-
-    ax.legend()
-
-    decorate_axis(ax)
-
-    finish_figure(
-        fig,
-        "compare_density.png"
+        filename="compare_density.png"
     )
 
 
@@ -355,56 +364,53 @@ def plot_density(
 # ТЕМПЕРАТУРА
 # ============================================================
 
-def plot_temperature(
-    time_1h, T_1h,
-    time_1d, T_1d,
-    time_27d, T_27d
-):
+def plot_temperature(datasets):
 
-    fig, ax = plt.subplots()
+    plot_variable(
 
-    ax.plot(
-        time_1h,
-        T_1h,
-        color="0.65",
-        linewidth=0.8,
-        label="1 hour"
+        datasets=datasets,
+
+        variable="T",
+
+        ylabel="Proton temperature, K",
+
+        filename="compare_temperature.png"
     )
 
-    ax.plot(
-        time_1d,
-        T_1d,
-        color="tab:blue",
-        linewidth=1.5,
-        label="1 day"
-    )
 
-    ax.plot(
-        time_27d,
-        T_27d,
-        color="tab:red",
-        linewidth=2.2,
-        marker="o",
-        markersize=4,
-        label="27 days"
-    )
+# ============================================================
+# ИНФОРМАЦИЯ О ФАЙЛАХ
+# ============================================================
 
-    ax.set_xlabel(
-        "Date"
-    )
+def print_dataset_info(datasets):
 
-    ax.set_ylabel(
-        "Proton temperature, K"
-    )
+    print()
+    print("OMNI files loaded")
+    print("=================")
 
-    ax.legend()
+    for i, ds in enumerate(datasets, start=1):
 
-    decorate_axis(ax)
+        print()
 
-    finish_figure(
-        fig,
-        "compare_temperature.png"
-    )
+        print(
+            f"{i}. {ds['label']}"
+        )
+
+        print(
+            f"   file:   {ds['path']}"
+        )
+
+        print(
+            f"   points: {len(ds['time'])}"
+        )
+
+        print(
+            f"   start:  {ds['time'][0]}"
+        )
+
+        print(
+            f"   end:    {ds['time'][-1]}"
+        )
 
 
 # ============================================================
@@ -416,67 +422,43 @@ def main():
     setup_style()
 
     # --------------------------------------------------------
-    # Читаем три файла
+    # Проверка
     # --------------------------------------------------------
 
-    time_1h, V_1h, n_1h, T_1h = load_omni_file(
-        FILE_1H
-    )
+    if len(FILES) == 0:
 
-    time_1d, V_1d, n_1d, T_1d = load_omni_file(
-        FILE_1D
-    )
+        raise RuntimeError(
+            "Список FILES пуст."
+        )
 
-    time_27d, V_27d, n_27d, T_27d = load_omni_file(
-        FILE_27D
-    )
+    # --------------------------------------------------------
+    # Загружаем ВСЕ указанные файлы
+    # --------------------------------------------------------
+
+    datasets = load_all_files()
 
     # --------------------------------------------------------
     # Информация
     # --------------------------------------------------------
 
-    print()
-    print("OMNI files loaded")
-    print("=================")
-
-    print()
-    print("1 hour:")
-    print(f"  points: {len(time_1h)}")
-    print(f"  start:  {time_1h[0]}")
-    print(f"  end:    {time_1h[-1]}")
-
-    print()
-    print("1 day:")
-    print(f"  points: {len(time_1d)}")
-    print(f"  start:  {time_1d[0]}")
-    print(f"  end:    {time_1d[-1]}")
-
-    print()
-    print("27 days:")
-    print(f"  points: {len(time_27d)}")
-    print(f"  start:  {time_27d[0]}")
-    print(f"  end:    {time_27d[-1]}")
+    print_dataset_info(
+        datasets
+    )
 
     # --------------------------------------------------------
     # Графики
     # --------------------------------------------------------
 
     plot_velocity(
-        time_1h, V_1h,
-        time_1d, V_1d,
-        time_27d, V_27d
+        datasets
     )
 
     plot_density(
-        time_1h, n_1h,
-        time_1d, n_1d,
-        time_27d, n_27d
+        datasets
     )
 
     plot_temperature(
-        time_1h, T_1h,
-        time_1d, T_1d,
-        time_27d, T_27d
+        datasets
     )
 
 
