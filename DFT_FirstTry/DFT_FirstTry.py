@@ -185,7 +185,7 @@ TARGET_PEAK_PERIODS_DAYS = [
 #     target - 1 day ... target + 1 day
 # 700.0 for 11-years cycle
 PEAK_SEARCH_HALF_WIDTH_DAYS = 1.0
-
+Окей
 
 # ============================================================
 # ЛОКАЛЬНЫЙ ФОН СПЕКТРА: СКОЛЬЗЯЩАЯ МЕДИАНА

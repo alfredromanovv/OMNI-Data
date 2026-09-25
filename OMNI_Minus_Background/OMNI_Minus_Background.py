@@ -1,640 +1,640 @@
-# # -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 
-# from pathlib import Path
-# from datetime import datetime, timedelta
+from pathlib import Path
+from datetime import datetime, timedelta
 
-# import numpy as np
-# import matplotlib.pyplot as plt
-# from matplotlib.ticker import AutoMinorLocator
-# import matplotlib.dates as mdates
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.ticker import AutoMinorLocator
+import matplotlib.dates as mdates
 
 
-# # ============================================================
-# # НАСТРОЙКИ
-# # ============================================================
+# ============================================================
+# НАСТРОЙКИ
+# ============================================================
 
-# # Для этого эксперимента лучше использовать DAILY AVERAGED DATA.
-# #
-# # Формат:
-# # YEAR DOY Hour Temperature Density Speed
+# Для этого эксперимента лучше использовать DAILY AVERAGED DATA.
+#
+# Формат:
+# YEAR DOY Hour Temperature Density Speed
 
-# FILES = [
+FILES = [
 
-#     {
-#         "path": Path(
-#             r"F:\Yandex.Disk\Универ\Семестр 11\Научка\Игра с данными\2003_2005\OMNI_1day.txt"
-#         ),
-#         "label": "Daily OMNI",
-#     },
+    {
+        "path": Path(
+            r"F:\Yandex.Disk\Универ\Семестр 11\Научка\Игра с данными\1964_2026\OMNI_1day.txt"
+        ),
+        "label": "Daily OMNI",
+    },
 
-# ]
+]
 
 
-# # Размер окна для определения медленного фона
-# BACKGROUND_DAYS = 27.0
+# Размер окна для определения медленного фона
+BACKGROUND_DAYS = 50.0
 
 
-# SAVE_FIGURES = False
-# SHOW_FIGURES = True
+SAVE_FIGURES = False
+SHOW_FIGURES = True
 
-# OUTPUT_DIR = FILES[0]["path"].parent / "OMNI_detrended"
+OUTPUT_DIR = FILES[0]["path"].parent / "OMNI_detrended"
 
 
-# # ============================================================
-# # СТИЛЬ
-# # ============================================================
+# ============================================================
+# СТИЛЬ
+# ============================================================
 
-# def setup_style():
+def setup_style():
 
-#     plt.rcParams.update({
+    plt.rcParams.update({
 
-#         "figure.figsize": (11.0, 7.0),
-#         "figure.dpi": 140,
+        "figure.figsize": (11.0, 7.0),
+        "figure.dpi": 140,
 
-#         "savefig.dpi": 600,
-#         "savefig.bbox": "tight",
+        "savefig.dpi": 600,
+        "savefig.bbox": "tight",
 
-#         "font.family": "serif",
-#         "mathtext.fontset": "dejavuserif",
+        "font.family": "serif",
+        "mathtext.fontset": "dejavuserif",
 
-#         "font.size": 11,
+        "font.size": 11,
 
-#         "axes.labelsize": 12,
-#         "axes.titlesize": 12,
+        "axes.labelsize": 12,
+        "axes.titlesize": 12,
 
-#         "axes.linewidth": 1.0,
+        "axes.linewidth": 1.0,
 
-#         "xtick.labelsize": 10,
-#         "ytick.labelsize": 10,
+        "xtick.labelsize": 10,
+        "ytick.labelsize": 10,
 
-#         "xtick.direction": "in",
-#         "ytick.direction": "in",
+        "xtick.direction": "in",
+        "ytick.direction": "in",
 
-#         "xtick.top": True,
-#         "ytick.right": True,
+        "xtick.top": True,
+        "ytick.right": True,
 
-#         "xtick.major.size": 5,
-#         "ytick.major.size": 5,
+        "xtick.major.size": 5,
+        "ytick.major.size": 5,
 
-#         "xtick.minor.size": 3,
-#         "ytick.minor.size": 3,
+        "xtick.minor.size": 3,
+        "ytick.minor.size": 3,
 
-#         "legend.frameon": False,
-#     })
+        "legend.frameon": False,
+    })
 
 
-# # ============================================================
-# # ЧТЕНИЕ OMNI-ФАЙЛА
-# # ============================================================
+# ============================================================
+# ЧТЕНИЕ OMNI-ФАЙЛА
+# ============================================================
 
-# def load_omni_file(filename: Path):
+def load_omni_file(filename: Path):
 
-#     if not filename.exists():
-#         raise FileNotFoundError(
-#             f"Файл не найден:\n{filename}"
-#         )
+    if not filename.exists():
+        raise FileNotFoundError(
+            f"Файл не найден:\n{filename}"
+        )
 
-#     # --------------------------------------------------------
-#     # Формат:
-#     #
-#     # 0 YEAR
-#     # 1 DOY
-#     # 2 Hour
-#     # 3 Temperature, K
-#     # 4 Density, cm^-3
-#     # 5 Speed, km/s
-#     # --------------------------------------------------------
+    # --------------------------------------------------------
+    # Формат:
+    #
+    # 0 YEAR
+    # 1 DOY
+    # 2 Hour
+    # 3 Temperature, K
+    # 4 Density, cm^-3
+    # 5 Speed, km/s
+    # --------------------------------------------------------
 
-#     data = np.loadtxt(filename)
+    data = np.loadtxt(filename)
 
-#     if data.ndim == 1:
-#         data = data.reshape(1, -1)
+    if data.ndim == 1:
+        data = data.reshape(1, -1)
 
-#     if data.shape[1] < 6:
-#         raise RuntimeError(
-#             f"В файле {filename}\n"
-#             f"ожидалось минимум 6 столбцов, "
-#             f"найдено: {data.shape[1]}"
-#         )
+    if data.shape[1] < 6:
+        raise RuntimeError(
+            f"В файле {filename}\n"
+            f"ожидалось минимум 6 столбцов, "
+            f"найдено: {data.shape[1]}"
+        )
 
-#     year = data[:, 0].astype(int)
-#     doy = data[:, 1].astype(int)
-#     hour = data[:, 2].astype(int)
+    year = data[:, 0].astype(int)
+    doy = data[:, 1].astype(int)
+    hour = data[:, 2].astype(int)
 
-#     T = data[:, 3].astype(float)
-#     n = data[:, 4].astype(float)
-#     V = data[:, 5].astype(float)
+    T = data[:, 3].astype(float)
+    n = data[:, 4].astype(float)
+    V = data[:, 5].astype(float)
 
-#     # ========================================================
-#     # ВРЕМЯ
-#     # ========================================================
+    # ========================================================
+    # ВРЕМЯ
+    # ========================================================
 
-#     time = []
+    time = []
 
-#     for y, d, h in zip(
-#         year,
-#         doy,
-#         hour
-#     ):
+    for y, d, h in zip(
+        year,
+        doy,
+        hour
+    ):
 
-#         t = (
-#             datetime(int(y), 1, 1)
-#             + timedelta(days=int(d) - 1)
-#             + timedelta(hours=int(h))
-#         )
+        t = (
+            datetime(int(y), 1, 1)
+            + timedelta(days=int(d) - 1)
+            + timedelta(hours=int(h))
+        )
 
-#         time.append(t)
+        time.append(t)
 
-#     time = np.array(time)
+    time = np.array(time)
 
-#     # ========================================================
-#     # УДАЛЕНИЕ FILL VALUES
-#     # ========================================================
+    # ========================================================
+    # УДАЛЕНИЕ FILL VALUES
+    # ========================================================
 
-#     T[T >= 9999999.0] = np.nan
-#     n[n >= 999.9] = np.nan
-#     V[V >= 9999.0] = np.nan
+    T[T >= 9999999.0] = np.nan
+    n[n >= 999.9] = np.nan
+    V[V >= 9999.0] = np.nan
 
-#     T[T <= 0] = np.nan
-#     n[n <= 0] = np.nan
-#     V[V <= 0] = np.nan
+    T[T <= 0] = np.nan
+    n[n <= 0] = np.nan
+    V[V <= 0] = np.nan
 
-#     return time, V, n, T
+    return time, V, n, T
 
 
-# # ============================================================
-# # ЗАГРУЗКА ВСЕХ ФАЙЛОВ
-# # ============================================================
+# ============================================================
+# ЗАГРУЗКА ВСЕХ ФАЙЛОВ
+# ============================================================
 
-# def load_all_files():
+def load_all_files():
 
-#     datasets = []
+    datasets = []
 
-#     for item in FILES:
+    for item in FILES:
 
-#         path = item["path"]
+        path = item["path"]
 
-#         label = item.get(
-#             "label",
-#             path.stem
-#         )
+        label = item.get(
+            "label",
+            path.stem
+        )
 
-#         time, V, n, T = load_omni_file(
-#             path
-#         )
+        time, V, n, T = load_omni_file(
+            path
+        )
 
-#         datasets.append({
+        datasets.append({
 
-#             "path": path,
-#             "label": label,
+            "path": path,
+            "label": label,
 
-#             "time": time,
+            "time": time,
 
-#             "V": V,
-#             "n": n,
-#             "T": T,
-#         })
+            "V": V,
+            "n": n,
+            "T": T,
+        })
 
-#     return datasets
+    return datasets
 
 
-# # ============================================================
-# # СКОЛЬЗЯЩЕЕ СРЕДНЕЕ ПО ВРЕМЕНИ
-# # ============================================================
+# ============================================================
+# СКОЛЬЗЯЩЕЕ СРЕДНЕЕ ПО ВРЕМЕНИ
+# ============================================================
 
-# def moving_average_time(
-#     time,
-#     values,
-#     window_days
-# ):
+def moving_average_time(
+    time,
+    values,
+    window_days
+):
 
-#     """
-#     Для каждой точки t_i считаем среднее
-#     по временному окну:
+    """
+    Для каждой точки t_i считаем среднее
+    по временному окну:
 
-#         t_i - window_days/2
-#         ...
-#         t_i + window_days/2
+        t_i - window_days/2
+        ...
+        t_i + window_days/2
 
-#     NaN игнорируются.
+    NaN игнорируются.
 
-#     То есть при window_days = 27
-#     берётся примерно +/- 13.5 суток.
-#     """
+    То есть при window_days = 27
+    берётся примерно +/- 13.5 суток.
+    """
 
-#     background = np.full(
-#         len(values),
-#         np.nan
-#     )
+    background = np.full(
+        len(values),
+        np.nan
+    )
 
-#     half_window = timedelta(
-#         days=window_days / 2.0
-#     )
+    half_window = timedelta(
+        days=window_days / 2.0
+    )
 
-#     for i in range(len(time)):
+    for i in range(len(time)):
 
-#         left_time = (
-#             time[i] - half_window
-#         )
+        left_time = (
+            time[i] - half_window
+        )
 
-#         right_time = (
-#             time[i] + half_window
-#         )
+        right_time = (
+            time[i] + half_window
+        )
 
-#         mask = (
-#             (time >= left_time)
-#             & (time <= right_time)
-#             & np.isfinite(values)
-#         )
+        mask = (
+            (time >= left_time)
+            & (time <= right_time)
+            & np.isfinite(values)
+        )
 
-#         if np.any(mask):
+        if np.any(mask):
 
-#             background[i] = np.mean(
-#                 values[mask]
-#             )
+            background[i] = np.mean(
+                values[mask]
+            )
 
-#     return background
+    return background
 
 
-# # ============================================================
-# # ОСИ
-# # ============================================================
+# ============================================================
+# ОСИ
+# ============================================================
 
-# def decorate_axis(ax):
+def decorate_axis(ax):
 
-#     ax.grid(
-#         True,
-#         which="major",
-#         linewidth=0.5,
-#         alpha=0.25
-#     )
+    ax.grid(
+        True,
+        which="major",
+        linewidth=0.5,
+        alpha=0.25
+    )
 
-#     ax.yaxis.set_minor_locator(
-#         AutoMinorLocator()
-#     )
+    ax.yaxis.set_minor_locator(
+        AutoMinorLocator()
+    )
 
-#     locator = mdates.AutoDateLocator()
+    locator = mdates.AutoDateLocator()
 
-#     formatter = mdates.ConciseDateFormatter(
-#         locator
-#     )
+    formatter = mdates.ConciseDateFormatter(
+        locator
+    )
 
-#     ax.xaxis.set_major_locator(
-#         locator
-#     )
+    ax.xaxis.set_major_locator(
+        locator
+    )
 
-#     ax.xaxis.set_major_formatter(
-#         formatter
-#     )
+    ax.xaxis.set_major_formatter(
+        formatter
+    )
 
-#     ax.tick_params(
-#         which="both",
-#         direction="in",
-#         top=True,
-#         right=True
-#     )
+    ax.tick_params(
+        which="both",
+        direction="in",
+        top=True,
+        right=True
+    )
 
-#     ax.margins(x=0)
+    ax.margins(x=0)
 
 
-# # ============================================================
-# # СОХРАНЕНИЕ
-# # ============================================================
+# ============================================================
+# СОХРАНЕНИЕ
+# ============================================================
 
-# def finish_figure(
-#     fig,
-#     filename
-# ):
+def finish_figure(
+    fig,
+    filename
+):
 
-#     fig.tight_layout()
+    fig.tight_layout()
 
-#     if SAVE_FIGURES:
+    if SAVE_FIGURES:
 
-#         OUTPUT_DIR.mkdir(
-#             parents=True,
-#             exist_ok=True
-#         )
+        OUTPUT_DIR.mkdir(
+            parents=True,
+            exist_ok=True
+        )
 
-#         path = OUTPUT_DIR / filename
+        path = OUTPUT_DIR / filename
 
-#         fig.savefig(
-#             path,
-#             dpi=600
-#         )
+        fig.savefig(
+            path,
+            dpi=600
+        )
 
-#         print(
-#             f"Saved: {path}"
-#         )
+        print(
+            f"Saved: {path}"
+        )
 
-#     if SHOW_FIGURES:
+    if SHOW_FIGURES:
 
-#         plt.show()
+        plt.show()
 
-#     else:
+    else:
 
-#         plt.close(fig)
+        plt.close(fig)
 
 
-# # ============================================================
-# # ГРАФИК:
-# #
-# # 1) исходные данные + фон
-# # 2) данные после вычитания фона
-# # ============================================================
+# ============================================================
+# ГРАФИК:
+#
+# 1) исходные данные + фон
+# 2) данные после вычитания фона
+# ============================================================
 
-# def plot_detrended_variable(
-#     dataset,
-#     variable,
-#     ylabel,
-#     residual_ylabel,
-#     filename
-# ):
+def plot_detrended_variable(
+    dataset,
+    variable,
+    ylabel,
+    residual_ylabel,
+    filename
+):
 
-#     time = dataset["time"]
+    time = dataset["time"]
 
-#     values = dataset[variable]
+    values = dataset[variable]
 
-#     # --------------------------------------------------------
-#     # Считаем 27-дневный локальный фон
-#     # --------------------------------------------------------
+    # --------------------------------------------------------
+    # Считаем 27-дневный локальный фон
+    # --------------------------------------------------------
 
-#     background = moving_average_time(
-#         time,
-#         values,
-#         BACKGROUND_DAYS
-#     )
+    background = moving_average_time(
+        time,
+        values,
+        BACKGROUND_DAYS
+    )
 
-#     # --------------------------------------------------------
-#     # Вычитаем фон
-#     # --------------------------------------------------------
+    # --------------------------------------------------------
+    # Вычитаем фон
+    # --------------------------------------------------------
 
-#     residual = (
-#         values - background
-#     )
+    residual = (
+        values - background
+    )
 
-#     # --------------------------------------------------------
-#     # ДВА ГРАФИКА В ОДНОМ ОКНЕ
-#     # --------------------------------------------------------
+    # --------------------------------------------------------
+    # ДВА ГРАФИКА В ОДНОМ ОКНЕ
+    # --------------------------------------------------------
 
-#     fig, axes = plt.subplots(
-#         nrows=2,
-#         ncols=1,
-#         figsize=(11.0, 7.0),
-#         sharex=True
-#     )
+    fig, axes = plt.subplots(
+        nrows=2,
+        ncols=1,
+        figsize=(11.0, 7.0),
+        sharex=True
+    )
 
-#     ax1 = axes[0]
-#     ax2 = axes[1]
+    ax1 = axes[0]
+    ax2 = axes[1]
 
-#     # ========================================================
-#     # ВЕРХНИЙ:
-#     # исходные данные + фон
-#     # ========================================================
+    # ========================================================
+    # ВЕРХНИЙ:
+    # исходные данные + фон
+    # ========================================================
 
-#     ax1.plot(
-#         time,
-#         values,
+    ax1.plot(
+        time,
+        values,
 
-#         linewidth=1.0,
-#         alpha=0.75,
+        linewidth=1.0,
+        alpha=0.75,
 
-#         label="Original daily data"
-#     )
+        label="Original daily data"
+    )
 
-#     ax1.plot(
-#         time,
-#         background,
+    ax1.plot(
+        time,
+        background,
 
-#         linewidth=2.0,
+        linewidth=2.0,
 
-#         label=f"{BACKGROUND_DAYS:.0f}-day moving average"
-#     )
+        label=f"{BACKGROUND_DAYS:.0f}-day moving average"
+    )
 
-#     ax1.set_ylabel(
-#         ylabel
-#     )
+    ax1.set_ylabel(
+        ylabel
+    )
 
-#     ax1.set_title(
-#         dataset["label"]
-#     )
+    ax1.set_title(
+        dataset["label"]
+    )
 
-#     ax1.legend()
+    ax1.legend()
 
-#     decorate_axis(
-#         ax1
-#     )
+    decorate_axis(
+        ax1
+    )
 
-#     # ========================================================
-#     # НИЖНИЙ:
-#     # остаток после вычитания фона
-#     # ========================================================
+    # ========================================================
+    # НИЖНИЙ:
+    # остаток после вычитания фона
+    # ========================================================
 
-#     ax2.plot(
-#         time,
-#         residual,
+    ax2.plot(
+        time,
+        residual,
 
-#         linewidth=1.0,
+        linewidth=1.0,
 
-#         label="Deviation from background"
-#     )
+        label="Deviation from background"
+    )
 
-#     # Нулевая линия
-#     ax2.axhline(
-#         y=0.0,
+    # Нулевая линия
+    ax2.axhline(
+        y=0.0,
 
-#         linewidth=0.8,
-#         color="black",
-#         alpha=0.7
-#     )
+        linewidth=0.8,
+        color="black",
+        alpha=0.7
+    )
 
-#     ax2.set_xlabel(
-#         "Date"
-#     )
+    ax2.set_xlabel(
+        "Date"
+    )
 
-#     ax2.set_ylabel(
-#         residual_ylabel
-#     )
+    ax2.set_ylabel(
+        residual_ylabel
+    )
 
-#     decorate_axis(
-#         ax2
-#     )
+    decorate_axis(
+        ax2
+    )
 
-#     finish_figure(
-#         fig,
-#         filename
-#     )
+    finish_figure(
+        fig,
+        filename
+    )
 
 
-# # ============================================================
-# # СКОРОСТЬ
-# # ============================================================
+# ============================================================
+# СКОРОСТЬ
+# ============================================================
 
-# def plot_velocity(
-#     datasets
-# ):
+def plot_velocity(
+    datasets
+):
 
-#     for i, dataset in enumerate(
-#         datasets,
-#         start=1
-#     ):
+    for i, dataset in enumerate(
+        datasets,
+        start=1
+    ):
 
-#         plot_detrended_variable(
+        plot_detrended_variable(
 
-#             dataset=dataset,
+            dataset=dataset,
 
-#             variable="V",
+            variable="V",
 
-#             ylabel=r"Solar-wind speed, km s$^{-1}$",
+            ylabel=r"Solar-wind speed, km s$^{-1}$",
 
-#             residual_ylabel=r"$V - \overline{V}_{27}$, km s$^{-1}$",
+            residual_ylabel=r"$V - \overline{V}_{27}$, km s$^{-1}$",
 
-#             filename=f"velocity_detrended_{i}.png"
-#         )
+            filename=f"velocity_detrended_{i}.png"
+        )
 
 
-# # ============================================================
-# # ПЛОТНОСТЬ
-# # ============================================================
+# ============================================================
+# ПЛОТНОСТЬ
+# ============================================================
 
-# def plot_density(
-#     datasets
-# ):
+def plot_density(
+    datasets
+):
 
-#     for i, dataset in enumerate(
-#         datasets,
-#         start=1
-#     ):
+    for i, dataset in enumerate(
+        datasets,
+        start=1
+    ):
 
-#         plot_detrended_variable(
+        plot_detrended_variable(
 
-#             dataset=dataset,
+            dataset=dataset,
 
-#             variable="n",
+            variable="n",
 
-#             ylabel=r"Proton number density, cm$^{-3}$",
+            ylabel=r"Proton number density, cm$^{-3}$",
 
-#             residual_ylabel=r"$n - \overline{n}_{27}$, cm$^{-3}$",
+            residual_ylabel=r"$n - \overline{n}_{27}$, cm$^{-3}$",
 
-#             filename=f"density_detrended_{i}.png"
-#         )
+            filename=f"density_detrended_{i}.png"
+        )
 
 
-# # ============================================================
-# # ТЕМПЕРАТУРА
-# # ============================================================
+# ============================================================
+# ТЕМПЕРАТУРА
+# ============================================================
 
-# def plot_temperature(
-#     datasets
-# ):
+def plot_temperature(
+    datasets
+):
 
-#     for i, dataset in enumerate(
-#         datasets,
-#         start=1
-#     ):
+    for i, dataset in enumerate(
+        datasets,
+        start=1
+    ):
 
-#         plot_detrended_variable(
+        plot_detrended_variable(
 
-#             dataset=dataset,
+            dataset=dataset,
 
-#             variable="T",
+            variable="T",
 
-#             ylabel="Proton temperature, K",
+            ylabel="Proton temperature, K",
 
-#             residual_ylabel=r"$T - \overline{T}_{27}$, K",
+            residual_ylabel=r"$T - \overline{T}_{27}$, K",
 
-#             filename=f"temperature_detrended_{i}.png"
-#         )
+            filename=f"temperature_detrended_{i}.png"
+        )
 
 
-# # ============================================================
-# # ИНФОРМАЦИЯ
-# # ============================================================
+# ============================================================
+# ИНФОРМАЦИЯ
+# ============================================================
 
-# def print_dataset_info(
-#     datasets
-# ):
+def print_dataset_info(
+    datasets
+):
 
-#     print()
-#     print("OMNI files loaded")
-#     print("=================")
+    print()
+    print("OMNI files loaded")
+    print("=================")
 
-#     print(
-#         f"Background window: "
-#         f"{BACKGROUND_DAYS:.1f} days"
-#     )
+    print(
+        f"Background window: "
+        f"{BACKGROUND_DAYS:.1f} days"
+    )
 
-#     for i, ds in enumerate(
-#         datasets,
-#         start=1
-#     ):
+    for i, ds in enumerate(
+        datasets,
+        start=1
+    ):
 
-#         print()
+        print()
 
-#         print(
-#             f"{i}. {ds['label']}"
-#         )
+        print(
+            f"{i}. {ds['label']}"
+        )
 
-#         print(
-#             f"   file:   {ds['path']}"
-#         )
+        print(
+            f"   file:   {ds['path']}"
+        )
 
-#         print(
-#             f"   points: {len(ds['time'])}"
-#         )
+        print(
+            f"   points: {len(ds['time'])}"
+        )
 
-#         print(
-#             f"   start:  {ds['time'][0]}"
-#         )
+        print(
+            f"   start:  {ds['time'][0]}"
+        )
 
-#         print(
-#             f"   end:    {ds['time'][-1]}"
-#         )
+        print(
+            f"   end:    {ds['time'][-1]}"
+        )
 
 
-# # ============================================================
-# # MAIN
-# # ============================================================
+# ============================================================
+# MAIN
+# ============================================================
 
-# def main():
+def main():
 
-#     setup_style()
+    setup_style()
 
-#     if len(FILES) == 0:
+    if len(FILES) == 0:
 
-#         raise RuntimeError(
-#             "Список FILES пуст."
-#         )
+        raise RuntimeError(
+            "Список FILES пуст."
+        )
 
-#     # --------------------------------------------------------
-#     # Загружаем данные
-#     # --------------------------------------------------------
+    # --------------------------------------------------------
+    # Загружаем данные
+    # --------------------------------------------------------
 
-#     datasets = load_all_files()
+    datasets = load_all_files()
 
-#     # --------------------------------------------------------
-#     # Информация
-#     # --------------------------------------------------------
+    # --------------------------------------------------------
+    # Информация
+    # --------------------------------------------------------
 
-#     print_dataset_info(
-#         datasets
-#     )
+    print_dataset_info(
+        datasets
+    )
 
-#     # --------------------------------------------------------
-#     # Графики
-#     # --------------------------------------------------------
+    # --------------------------------------------------------
+    # Графики
+    # --------------------------------------------------------
 
-#     plot_velocity(
-#         datasets
-#     )
+    plot_velocity(
+        datasets
+    )
 
-#     plot_density(
-#         datasets
-#     )
+    plot_density(
+        datasets
+    )
 
-#     plot_temperature(
-#         datasets
-#     )
+    plot_temperature(
+        datasets
+    )
 
 
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()
