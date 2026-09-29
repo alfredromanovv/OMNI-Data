@@ -5,7 +5,13 @@ from datetime import datetime, timedelta
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.ticker import AutoMinorLocator, MaxNLocator
+from matplotlib.ticker import (
+    AutoMinorLocator,
+    MaxNLocator,
+    LogLocator,
+    NullFormatter,
+    FuncFormatter,
+)
 
 
 # ============================================================
@@ -25,7 +31,7 @@ from matplotlib.ticker import AutoMinorLocator, MaxNLocator
 FILES = [
     {
         "path": Path(
-            r"F:\Yandex.Disk\Универ\Семестр 11\Научка\Игра с данными\Voyager-2\1977-2018\data.txt"
+            r"F:\Yandex.Disk\Универ\Семестр 11\Научка\Игра с данными\Voyager-2\1977-2018 day\data.txt"
         ),
         "label": "Voyager 2",
     },
@@ -37,8 +43,7 @@ FILES = [
 # ============================================================
 
 # Размер окна усреднения по времени.
-# Корольков использует 50 суток.
-AVERAGE_DAYS = 300.0
+AVERAGE_DAYS = 50.0
 
 # Показывать исходные часовые данные
 PLOT_RAW = True
@@ -54,7 +59,7 @@ PLOT_AVERAGE = True
 # None = весь доступный диапазон
 
 R_MIN = None
-R_MAX = None
+R_MAX = 70.0
 
 # Например:
 # R_MIN = 1.0
@@ -133,6 +138,91 @@ def setup_style():
         "pdf.fonttype": 42,
         "ps.fonttype": 42,
     })
+
+
+# ============================================================
+# КРАСИВЫЕ ПОДПИСИ ДЛЯ ЛОГАРИФМИЧЕСКОЙ ОСИ
+# ============================================================
+
+def plain_log_label(value, pos=None):
+
+    """
+    На логарифмической оси показывает обычные числа:
+
+        100, 200, 300, ...
+
+    вместо:
+
+        10^2, 2\times10^2, ...
+    """
+
+    if not np.isfinite(value) or value <= 0.0:
+        return ""
+
+    if value >= 1.0:
+        if abs(value - round(value)) < 1e-10 * max(1.0, abs(value)):
+            return f"{int(round(value))}"
+        return f"{value:g}"
+
+    if value >= 0.1:
+        return f"{value:.1f}".rstrip("0").rstrip(".")
+
+    if value >= 0.01:
+        return f"{value:.2f}".rstrip("0").rstrip(".")
+
+    return f"{value:.3g}"
+
+
+def setup_pretty_log_y_axis(ax, y_values):
+
+    """
+    Оставляет ось Y логарифмической, но подписывает её
+    обычными числами. Для небольшого диапазона, например
+    300--700 km/s, получаются подписи 300, 400, 500, 600, 700.
+    """
+
+    y = np.asarray(y_values, dtype=float)
+    y = y[np.isfinite(y) & (y > 0.0)]
+
+    if y.size == 0:
+        return
+
+    ymin = np.nanmin(y)
+    ymax = np.nanmax(y)
+
+    if ymin <= 0.0 or ymax <= ymin:
+        return
+
+    # Небольшой запас сверху и снизу
+    ax.set_ylim(ymin / 1.05, ymax * 1.05)
+
+    ratio = ymax / ymin
+
+    # Для скорости типа 300--700 показываем каждую сотню.
+    # Для более широких диапазонов не перегружаем ось.
+    if ratio <= 12.0:
+        major_subs = np.arange(1.0, 10.0)
+    elif ratio <= 100.0:
+        major_subs = np.array([1.0, 2.0, 5.0])
+    else:
+        major_subs = np.array([1.0])
+
+    ax.yaxis.set_major_locator(
+        LogLocator(
+            base=10.0,
+            subs=major_subs,
+            numticks=100
+        )
+    )
+
+    ax.yaxis.set_major_formatter(
+        FuncFormatter(plain_log_label)
+    )
+
+    # Минорные подписи не рисуем
+    ax.yaxis.set_minor_formatter(
+        NullFormatter()
+    )
 
 
 # ============================================================
@@ -818,21 +908,27 @@ def decorate_axis(ax):
 
     ax.grid(
         True,
-
         which="major",
+        linewidth=0.55,
+        alpha=0.22
+    )
 
-        linewidth=0.45,
-
-        alpha=0.18
+    ax.grid(
+        True,
+        which="minor",
+        linewidth=0.35,
+        alpha=0.10
     )
 
     ax.xaxis.set_minor_locator(
         AutoMinorLocator()
     )
 
-    ax.yaxis.set_minor_locator(
-        AutoMinorLocator()
-    )
+    # Для логарифмической оси Y локаторы уже заданы отдельно.
+    if ax.get_yscale() != "log":
+        ax.yaxis.set_minor_locator(
+            AutoMinorLocator()
+        )
 
     ax.xaxis.set_major_locator(
         MaxNLocator(
@@ -842,16 +938,13 @@ def decorate_axis(ax):
 
     ax.tick_params(
         which="both",
-
         direction="in",
-
         top=True,
-
         right=True
     )
 
     ax.margins(
-        x=0
+        x=0.01
     )
 
 
@@ -974,14 +1067,20 @@ def plot_radial_profile(
         & np.isfinite(avg)
     )
 
+    if log_y:
+        raw_mask &= (raw > 0.0)
+        avg_mask &= (avg > 0.0)
+
 
     # ========================================================
     # ГРАФИК
     # ========================================================
 
     fig, ax = plt.subplots(
-        figsize=(9.0, 5.5)
+        figsize=(9.2, 5.6)
     )
+
+    ax.set_facecolor("#f7f7f7")
 
 
     # --------------------------------------------------------
@@ -994,9 +1093,11 @@ def plot_radial_profile(
             rr[raw_mask],
             raw[raw_mask],
 
-            linewidth=0.50,
+            color="#4c72ff",
 
-            alpha=0.30,
+            linewidth=0.70,
+
+            alpha=0.38,
 
             label="Voyager 2 hourly data",
 
@@ -1014,7 +1115,9 @@ def plot_radial_profile(
             rr[avg_mask],
             avg[avg_mask],
 
-            linewidth=2.2,
+            color="#e34a33",
+
+            linewidth=2.3,
 
             alpha=1.0,
 
@@ -1052,6 +1155,16 @@ def plot_radial_profile(
 
         ax.set_yscale(
             "log"
+        )
+
+        y_for_scale = np.concatenate([
+            raw[raw_mask] if np.any(raw_mask) else np.array([]),
+            avg[avg_mask] if np.any(avg_mask) else np.array([])
+        ])
+
+        setup_pretty_log_y_axis(
+            ax,
+            y_for_scale
         )
 
 
@@ -1280,6 +1393,12 @@ def plot_all_profiles(
                 & np.isfinite(average)
             )
 
+            if log_y:
+                raw_mask &= (raw > 0.0)
+                avg_mask &= (average > 0.0)
+
+            ax.set_facecolor("#f7f7f7")
+
 
             # -----------------------------------------------
             # Сырые данные
@@ -1291,9 +1410,11 @@ def plot_all_profiles(
                     rr[raw_mask],
                     raw[raw_mask],
 
-                    linewidth=0.45,
+                    color="#4c72ff",
 
-                    alpha=0.28,
+                    linewidth=0.65,
+
+                    alpha=0.35,
 
                     label="Hourly data",
 
@@ -1311,7 +1432,9 @@ def plot_all_profiles(
                     rr[avg_mask],
                     average[avg_mask],
 
-                    linewidth=2.0,
+                    color="#e34a33",
+
+                    linewidth=2.1,
 
                     label=(
                         f"{AVERAGE_DAYS:.0f}-day "
@@ -1331,6 +1454,16 @@ def plot_all_profiles(
 
                 ax.set_yscale(
                     "log"
+                )
+
+                y_for_scale = np.concatenate([
+                    raw[raw_mask] if np.any(raw_mask) else np.array([]),
+                    average[avg_mask] if np.any(avg_mask) else np.array([])
+                ])
+
+                setup_pretty_log_y_axis(
+                    ax,
+                    y_for_scale
                 )
 
 
