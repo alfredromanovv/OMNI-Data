@@ -34,7 +34,7 @@ from matplotlib.ticker import (
 
 DATA_DIR = Path(
     r"F:\Yandex.Disk\Универ\Семестр 11\Научка"
-    r"\Попытка-реальных-данных\Попытка-6\Time-files"
+    r"\Попытка-реальных-данных\Попытка-7\Time-files"
 )
 
 # ------------------------------------------------------------
@@ -44,7 +44,7 @@ DATA_DIR = Path(
 # Будет выбран ближайший существующий results_*.txt
 #
 
-TARGET_TIME = 250.0
+TARGET_TIME = 276.0
 
 
 # ------------------------------------------------------------
@@ -115,7 +115,7 @@ LOG_Y = True
 # ------------------------------------------------------------
 
 X_MIN = None
-X_MAX = 41.0
+X_MAX = 71.0
 
 
 # ------------------------------------------------------------
@@ -131,11 +131,49 @@ GAMMA = 5.0 / 3.0
 
 R_UNIT_AU = 1.0
 
-# 8.8 <-> 450 km/s
-U_UNIT_KMS = 450.0 / 8.8
+# Выбираем единицу скорости так, чтобы
+# u_tilde = 8.8 соответствовало ровно 400 km/s.
+U_REFERENCE_TILDE = 8.8
+U_REFERENCE_KMS = 400.0
+U_UNIT_KMS = U_REFERENCE_KMS / U_REFERENCE_TILDE
 
 # rho_tilde = 1 <-> n = 5 cm^-3
 N0_CM3 = 5.0
+
+
+# ------------------------------------------------------------
+# АНАЛИТИЧЕСКАЯ АСИМПТОТИКА
+# ------------------------------------------------------------
+#
+# Для сферического стационарного истечения используем
+#
+#   rho ~ r^-2
+#   u   = const
+#   p   ~ r^(-2 gamma)
+#   T   ~ r^(-2(gamma-1))
+#   s   = const
+#   M   ~ r^(gamma-1)
+#
+# ВАЖНО: аналитика больше НЕ нормируется по первой точке
+# численного решения. Все опорные величины задаются здесь.
+# Поэтому изменение X_MIN не меняет зелёную кривую.
+#
+# Опорный радиус задаётся в AU.
+EXACT_R0_AU = 1.0
+
+# Опорные значения в БЕЗРАЗМЕРНЫХ переменных.
+# Для твоего стационарного сферического истечения:
+# rho(1 AU) = 1, p(1 AU) = 1/gamma.
+EXACT_RHO0_TILDE = 1.0
+EXACT_P0_TILDE = 1.0 / GAMMA
+
+# Скорость удобнее задавать сразу физически.
+EXACT_U0_KMS = 400.0
+
+# Если True, в консоли дополнительно печатается сравнение
+# численного и аналитического решений в точке сетки,
+# ближайшей к EXACT_R0_AU.
+PRINT_EXACT_REFERENCE_COMPARISON = True
 
 
 # ------------------------------------------------------------
@@ -796,8 +834,8 @@ def make_time_average(
 def make_exact_solution(data):
 
     """
-    Exact нормируется по первой точке
-    ИСХОДНОГО численного профиля TARGET_TIME.
+    Строит аналитическую асимптотику относительно ФИКСИРОВАННОЙ
+    опорной точки r0 = EXACT_R0_AU.
 
     Для gamma = 5/3:
 
@@ -807,52 +845,59 @@ def make_exact_solution(data):
         T   ~ r^-4/3
         s   ~ const
         M   ~ r^2/3
+
+    Опорные значения задаются в SETTINGS и не зависят
+    от первой точки численного профиля или X_MIN.
     """
 
-
-    r = data["r"]
-
+    r = np.asarray(data["r"], dtype=float)
 
     if len(r) == 0:
+        raise RuntimeError("Нет точек для exact solution.")
 
-        raise RuntimeError(
-            "Нет точек для exact solution."
-        )
-
-
-    r0 = r[0]
-
-    rho0 = data["rho"][0]
-
-    u0 = data["u"][0]
-
-    p0 = data["p"][0]
-
-    T0 = data["T"][0]
-
-    s0 = data["s"][0]
-
-    M0 = data["M"][0]
-
+    # --------------------------------------------------------------
+    # Опорный радиус в тех единицах, в которых сейчас хранится data.
+    # --------------------------------------------------------------
+    if DIMENSIONAL:
+        r0 = EXACT_R0_AU
+    else:
+        r0 = EXACT_R0_AU / R_UNIT_AU
 
     if r0 <= 0.0:
+        raise RuntimeError("Для степенного решения нужно r0 > 0.")
 
-        raise RuntimeError(
-            "Для степенного решения нужно r0 > 0."
-        )
+    # --------------------------------------------------------------
+    # Опорные значения аналитики.
+    # Сначала задаём их в безразмерном виде.
+    # --------------------------------------------------------------
+    rho0_tilde = EXACT_RHO0_TILDE
+    u0_tilde = EXACT_U0_KMS / U_UNIT_KMS
+    p0_tilde = EXACT_P0_TILDE
 
+    T0_tilde = p0_tilde / rho0_tilde
+    s0_tilde = p0_tilde / rho0_tilde**GAMMA
+    a0_tilde = np.sqrt(GAMMA * p0_tilde / rho0_tilde)
+    M0 = abs(u0_tilde) / a0_tilde
 
-    ratio = (
-        r0
-        / r
-    )
+    # --------------------------------------------------------------
+    # Переводим опорные значения в тот же набор единиц, что data.
+    # --------------------------------------------------------------
+    if DIMENSIONAL:
+        rho0 = rho0_tilde * RHO_UNIT
+        u0 = EXACT_U0_KMS
+        p0 = p0_tilde * P_UNIT_PA
+        T0 = T0_tilde * T_UNIT_K
+        s0 = p0 / rho0**GAMMA
+    else:
+        rho0 = rho0_tilde
+        u0 = u0_tilde
+        p0 = p0_tilde
+        T0 = T0_tilde
+        s0 = s0_tilde
 
+    ratio = r0 / r
 
-    rho_exact = (
-        rho0
-        * ratio**2
-    )
-
+    rho_exact = rho0 * ratio**2
 
     u_exact = np.full_like(
         r,
@@ -860,23 +905,9 @@ def make_exact_solution(data):
         dtype=float
     )
 
+    p_exact = p0 * ratio**(2.0 * GAMMA)
 
-    p_exact = (
-        p0
-        * ratio**(
-            2.0 * GAMMA
-        )
-    )
-
-
-    T_exact = (
-        T0
-        * ratio**(
-            2.0
-            * (GAMMA - 1.0)
-        )
-    )
-
+    T_exact = T0 * ratio**(2.0 * (GAMMA - 1.0))
 
     s_exact = np.full_like(
         r,
@@ -884,29 +915,15 @@ def make_exact_solution(data):
         dtype=float
     )
 
-
-    M_exact = (
-        M0
-        * (r / r0)**(
-            GAMMA - 1.0
-        )
-    )
-
+    M_exact = M0 * (r / r0)**(GAMMA - 1.0)
 
     return {
-
         "r": r.copy(),
-
         "rho": rho_exact,
-
         "u": u_exact,
-
         "p": p_exact,
-
         "T": T_exact,
-
         "s": s_exact,
-
         "M": M_exact,
     }
 
@@ -1543,52 +1560,43 @@ def plot_result():
 
 
     # ==================================================================
-    # EXACT NORMALIZATION
+    # EXACT REFERENCE / COMPARISON
     # ==================================================================
 
     if SHOW_EXACT:
 
-        r0 = data["r"][0]
-
-        y0_num = data[FIELD][0]
-
-        y0_exact = exact[FIELD][0]
-
-
         print()
+        print("-" * 72)
+        print("ANALYTIC REFERENCE")
+        print("-" * 72)
 
-        print(
-            "-" * 72
-        )
+        print(f"Reference r0         : {EXACT_R0_AU:g} AU")
+        print(f"rho0_tilde           : {EXACT_RHO0_TILDE:.10e}")
+        print(f"u0                    : {EXACT_U0_KMS:.10e} km/s")
+        print(f"p0_tilde             : {EXACT_P0_TILDE:.10e}")
+        print(f"u0_tilde             : {EXACT_U0_KMS / U_UNIT_KMS:.10e}")
 
-        print(
-            "EXACT NORMALIZATION"
-        )
+        if PRINT_EXACT_REFERENCE_COMPARISON:
+            r_target = (
+                EXACT_R0_AU
+                if DIMENSIONAL
+                else EXACT_R0_AU / R_UNIT_AU
+            )
 
-        print(
-            "-" * 72
-        )
+            i_ref = int(np.argmin(np.abs(data["r"] - r_target)))
+            r_num = data["r"][i_ref]
+            y_num = data[FIELD][i_ref]
+            y_exact = exact[FIELD][i_ref]
 
+            print()
+            print(f"Nearest numerical r  : {r_num:.10e}")
+            print(f"Numerical y          : {y_num:.10e}")
+            print(f"Exact y              : {y_exact:.10e}")
+            print(f"Exact - numerical    : {y_exact - y_num:.10e}")
 
-        print(
-            f"Reference r0         : "
-            f"{r0:.10e}"
-        )
-
-        print(
-            f"Numerical y(r0)      : "
-            f"{y0_num:.10e}"
-        )
-
-        print(
-            f"Exact y(r0)          : "
-            f"{y0_exact:.10e}"
-        )
-
-        print(
-            f"Difference           : "
-            f"{y0_exact - y0_num:.10e}"
-        )
+            if np.isfinite(y_exact) and y_exact != 0.0:
+                rel = (y_num - y_exact) / y_exact
+                print(f"Relative error       : {rel:.10e}")
 
 
     print()
