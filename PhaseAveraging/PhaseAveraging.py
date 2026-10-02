@@ -18,10 +18,11 @@ VARIABLE = "speed"
 MAX_LAG_DAYS = 150
 
 # Save figure
-SAVE_FIGURE = False
+SAVE_FIGURE = True
 OUTPUT_FILE = "autocorrelation_speed.pdf"
 
-DPI = 300
+# High resolution for raster formats
+DPI = 600
 
 
 # ============================================================
@@ -120,9 +121,9 @@ def autocorrelation_with_missing(
     max_lag
 ):
     """
-    Normalized autocorrelation that handles NaNs.
+    Normalized autocorrelation with NaN handling.
 
-    For every lag k, only pairs
+    For each lag k, only pairs
         x[i], x[i+k]
     where both values are finite are used.
     """
@@ -171,9 +172,9 @@ def autocorrelation_with_missing(
         x2c = x2 - np.mean(x2)
 
         denominator = np.sqrt(
-            np.sum(x1c**2)
+            np.sum(x1c ** 2)
             *
-            np.sum(x2c**2)
+            np.sum(x2c ** 2)
         )
 
         if denominator == 0:
@@ -200,86 +201,145 @@ def plot_autocorrelation(
     output_file=None
 ):
 
+    # ========================================================
+    # ARTICLE-QUALITY STYLE
+    # ========================================================
+
     plt.rcParams.update({
+
+        # Fonts
         "font.family": "serif",
-        "font.size": 11,
-        "axes.labelsize": 12,
-        "axes.titlesize": 13,
-        "xtick.labelsize": 10,
-        "ytick.labelsize": 10,
+        "font.size": 14,
+        "font.weight": "bold",
 
-        "axes.linewidth": 0.8,
+        "axes.labelsize": 16,
+        "axes.labelweight": "bold",
 
+        "axes.titlesize": 16,
+        "axes.titleweight": "bold",
+
+        "xtick.labelsize": 13,
+        "ytick.labelsize": 13,
+
+        # Axes
+        "axes.linewidth": 1.4,
+
+        # Tick direction
         "xtick.direction": "in",
         "ytick.direction": "in",
 
         "xtick.top": True,
         "ytick.right": True,
 
-        "xtick.major.size": 5,
-        "ytick.major.size": 5,
+        # Tick thickness
+        "xtick.major.width": 1.3,
+        "ytick.major.width": 1.3,
 
-        "xtick.minor.size": 3,
-        "ytick.minor.size": 3,
+        "xtick.minor.width": 1.0,
+        "ytick.minor.width": 1.0,
 
+        # Tick length
+        "xtick.major.size": 7,
+        "ytick.major.size": 7,
+
+        "xtick.minor.size": 4,
+        "ytick.minor.size": 4,
+
+        # Export quality
         "savefig.dpi": DPI,
 
-        "mathtext.fontset": "dejavuserif"
+        # Math
+        "mathtext.fontset": "dejavuserif",
+
+        # Vector font embedding
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
     })
 
     fig, ax = plt.subplots(
-        figsize=(8.0, 4.8),
+        figsize=(9.0, 5.5),
         constrained_layout=True
     )
+
+    # --------------------------------------------------------
+    # Main autocorrelation curve
+    # --------------------------------------------------------
 
     ax.plot(
         lags,
         acf,
-        linewidth=1.8,
-        label="Autocorrelation"
+        linewidth=2.8,
+        label="Autocorrelation",
+        zorder=3
     )
+
+    # --------------------------------------------------------
+    # Zero line
+    # --------------------------------------------------------
 
     ax.axhline(
         0.0,
-        linewidth=0.8,
-        linestyle="--"
+        linewidth=1.3,
+        linestyle="--",
+        alpha=0.8,
+        zorder=1
     )
 
-    # Solar rotation harmonics
-    for lag in [
+    # --------------------------------------------------------
+    # Solar rotation recurrence lags
+    # --------------------------------------------------------
+
+    recurrence_lags = [
         27,
         54,
         81,
         108,
         135
-    ]:
+    ]
+
+    for lag in recurrence_lags:
 
         if lag <= lags[-1]:
 
             ax.axvline(
                 lag,
                 linestyle=":",
-                linewidth=1.0,
-                alpha=0.7
+                linewidth=1.5,
+                alpha=0.8,
+                zorder=2
             )
 
             ax.text(
                 lag,
-                0.95,
+                0.94,
                 f"{lag} d",
                 rotation=90,
                 va="top",
                 ha="right",
+                fontsize=12,
+                fontweight="bold",
                 transform=ax.get_xaxis_transform()
             )
 
+    # ========================================================
+    # LABELS
+    # ========================================================
+
     ax.set_xlabel(
-        r"Time lag $\tau$ [days]"
+        r"Time lag $\tau$ [days]",
+        labelpad=10,
+        fontweight="bold"
     )
 
     ax.set_ylabel(
-        r"Autocorrelation $R(\tau)$"
+        r"Autocorrelation $R(\tau)$",
+        labelpad=10,
+        fontweight="bold"
     )
+
+    # --------------------------------------------------------
+    # Title
+    # --------------------------------------------------------
 
     titles = {
         "speed":
@@ -307,8 +367,14 @@ def plot_autocorrelation(
 
     ax.set_title(
         f"{main_title}\n"
-        f"{start_str} — {end_str}"
+        f"{start_str} — {end_str}",
+        pad=14,
+        fontweight="bold"
     )
+
+    # ========================================================
+    # AXES
+    # ========================================================
 
     ax.set_xlim(
         0,
@@ -320,19 +386,37 @@ def plot_autocorrelation(
         1
     )
 
+    # Make tick labels bold
+    for label in ax.get_xticklabels():
+        label.set_fontweight("bold")
+
+    for label in ax.get_yticklabels():
+        label.set_fontweight("bold")
+
+    # --------------------------------------------------------
+    # Grid
+    # --------------------------------------------------------
+
     ax.grid(
         True,
         which="major",
-        alpha=0.22
+        linewidth=0.8,
+        alpha=0.25,
+        zorder=0
     )
 
     ax.minorticks_on()
+
+    # ========================================================
+    # SAVE
+    # ========================================================
 
     if output_file is not None:
 
         fig.savefig(
             output_file,
-            bbox_inches="tight"
+            bbox_inches="tight",
+            dpi=DPI
         )
 
         print()
@@ -422,7 +506,8 @@ def main():
         27,
         54,
         81,
-        108
+        108,
+        135
     ]:
 
         if lag <= MAX_LAG_DAYS:
